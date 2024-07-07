@@ -1,7 +1,16 @@
+import base64
 import json
-from fastapi import FastAPI, HTTPException, Depends, Form
+import logging
+from fastapi import FastAPI, HTTPException, Depends, Form , status , File, UploadFile
 import aiohttp
 import asyncio
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+
+
+class BuyTicketRequest(BaseModel):
+    id: int
+
 
 app = FastAPI()
 
@@ -19,17 +28,27 @@ async def send_message(data):
         url = f"https://graph.facebook.com/{config['VERSION']}/{config['PHONE_NUMBER_ID']}/messages"
         try:
             async with session.post(url, data=data, headers=headers) as response:
-                if response.status == 200:
-                    print("Status hiiii:", response.status)
-                    print("Content-type:", response.headers['content-type'])
+                response_data = await response.json()  # Convert response to JSON if applicable
 
-                    html = await response.text()
-                    print("Body:", html)
+                if response.status == 200:
+                    logging.info(f"Message sent successfully. Response: {response_data}")
                 else:
-                    print(response.status)
-                    print(response)
+                    logging.error(f"Failed to send message. Status: {response.status}. Response: {response_data}")
         except aiohttp.ClientConnectorError as e:
-            print('Connection Error', str(e))
+            logging.error(f'Connection Error: {str(e)}')
+        # try:
+        #     async with session.post(url, data=data, headers=headers) as response:
+        #         if response.status == 200:
+        #             print("Status hiiii:", response.status)
+        #             print("Content-type:", response.headers['content-type'])
+
+        #             html = await response.text()
+        #             print("Body:", html)
+        #         else:
+        #             print(response.status)
+        #             print(response)
+        # except aiohttp.ClientConnectorError as e:
+        #     print('Connection Error', str(e))
 
 def get_text_message_input(recipient, text):
     return json.dumps({
@@ -48,6 +67,47 @@ async def welcome(text : str ,recipient_waid: str = Form(...)):
     data = get_text_message_input(recipient_waid, text)
     await send_message(data)
     return {"message": "Message sent successfully"}
+
+
+
+
+
+
+@app.post("/buy-ticket")
+async def buy_ticket(text: str = Form(...)):
+    # Specify the path to your file
+    file_path = './serie1-THL.pdf'
+    
+    # Open the file in binary mode and read its content
+    with open(file_path, 'rb') as file:
+        attachment_bytes = file.read()
+
+    
+    # Encode the attachment content to base64
+    base64_attachment = base64.b64encode(attachment_bytes).decode('utf-8')
+    data = get_message_with_attachment(config['RECIPIENT_WAID'], base64_attachment ,file_path ,  text)
+    await send_message(data)
+    return {"message": "Message sent successfully"}
+
+
+def get_message_with_attachment(recipient, attachment , file_path , text):
+    # Construct message JSON with attachment and text
+    
+    
+     
+    message_data = {
+        "messaging_product": "whatsapp",
+        "to": recipient,
+        "type": "document",
+        "document": {
+            "link": "https://docs.google.com/viewerng/viewer?url=https://www.learningcontainer.com/download/sample-pdf-file-for-testing/?ind%3D0%26filename%3Dsample-pdf-file.pdf%26wpdmdl%3D1566%26refresh%3D6688f1e61be411720250854%26open%3D1",
+            "filename": "randompdf.pdf",
+            "caption": text
+    }
+    }
+    
+    
+    return json.dumps(message_data)
 
 # Run the application with uvicorn
 if __name__ == "__main__":
