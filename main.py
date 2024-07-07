@@ -1,9 +1,8 @@
-
 import json
 import logging
+import os
 from fastapi import FastAPI, HTTPException, Depends, Form, Request , status , File, UploadFile
 import aiohttp
-
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -92,6 +91,7 @@ async def send_request(url, method='POST', data=None):
         except aiohttp.ClientConnectorError as e:
             logging.error(f'Connection Error: {str(e)}')
             return {"error": str(e)}
+        
 
 
 
@@ -109,57 +109,40 @@ async def buy_ticket(text: str = Form(...)):
     await send_message(data)
     return {"message": "Message sent successfully"}
 
-@app.get("/webhook")#!this for the verification of the webhook
-async def verify(request: Request):
-    mode = request.query_params.get('hub.mode')
-    token = request.query_params.get('hub.verify_token')
-    challenge = request.query_params.get('hub.challenge')
-    
-    if mode and token:
-        if mode == 'subscribe' and token == VERIFY_TOKEN:
-            return PlainTextResponse(challenge)
-        else:
-            raise HTTPException(status_code=403, detail="Verification failed")
-    raise HTTPException(status_code=400, detail="Bad request")
 
-@app.post("/webhook")#!this is for receiving the messages
-async def receive_message(request: Request):
-    data = await request.json()
-    process_message(data)
-    print(data) #! log the incoming message
-    return {"status": "received"}
 
-# @app.post("/webhook")
-# async def webhook(request: Request):
-#     try:
-#         data = await request.json()
-#         logging.info(f"Received webhook data: {data}")
+@app.post("/webhook")
+async def webhook(request: Request):
+    try:
+        data = await request.json()
+        logging.info(f"Received webhook data: {data}")
 
-#         # Process incoming message
-#         for entry in data.get("entry", []):
-#             for change in entry.get("changes", []):
-#                 value = change.get("value", {})
-#                 messages = value.get("messages", [])
-#                 for message in messages:
-#                     # Handle the incoming message here
-#                     logging.info(f"Incoming message: {message}")
-#                     # You can add more logic to process the message and respond accordingly
-#         return {"status": "success"}
-#     except Exception as e:
-#         logging.error(f"Error processing webhook: {str(e)}")
-#         raise HTTPException(status_code=400, detail="Error processing webhook")
+        # Process incoming message
+        for entry in data.get("entry", []):
+            for change in entry.get("changes", []):
+                value = change.get("value", {})
+                messages = value.get("messages", [])
+                for message in messages:
+                    # Handle the incoming message here
+                    logging.info(f"Incoming message: {message}")
+                    # You can add more logic to process the message and respond accordingly
+        return {"status": "success"}
+    except Exception as e:
+        logging.error(f"Error processing webhook: {str(e)}")
+        raise HTTPException(status_code=400, detail="Error processing webhook")
 
-# @app.get("/webhook")
-# async def verify_token(request: Request):
-#     token = request.query_params.get("hub.verify_token")
-#     challenge = request.query_params.get("hub.challenge")
-#     if token == config["VERIFY_TOKEN"]:
-#         return int(challenge)
-#     else:
-#         raise HTTPException(status_code=403, detail="Invalid verification token")
+@app.get("/webhook")
+async def verify_token(request: Request):
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+    if token == config["VERIFY_TOKEN"]:
+        return int(challenge)
+    else:
+        raise HTTPException(status_code=403, detail="Invalid verification token")
 
 
 # Run the application with uvicorn
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
