@@ -114,8 +114,10 @@ async def buy_ticket(text: str = Form(...)):
 @app.post("/webhook")
 async def webhook(request: Request):
     try:
-        data = await request.json()
-        logging.info(f"Received webhook data: {data}")
+        
+        data = request.json
+        message = data.get('message', 'No message provided')
+        logging.info(f'Received message: {message}')
 
         # Process incoming message
         for entry in data.get("entry", []):
