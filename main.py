@@ -109,6 +109,38 @@ def get_message_with_attachment(recipient, attachment , file_path , text):
     
     return json.dumps(message_data)
 
+
+@app.post("/webhook")
+async def webhook(request: Request):
+    try:
+        data = await request.json()
+        logging.info(f"Received webhook data: {data}")
+
+        # Process incoming message
+        for entry in data.get("entry", []):
+            for change in entry.get("changes", []):
+                value = change.get("value", {})
+                messages = value.get("messages", [])
+                for message in messages:
+                    # Handle the incoming message here
+                    logging.info(f"Incoming message: {message}")
+                    # You can add more logic to process the message and respond accordingly
+
+        return {"status": "success"}
+    except Exception as e:
+        logging.error(f"Error processing webhook: {str(e)}")
+        raise HTTPException(status_code=400, detail="Error processing webhook")
+
+@app.get("/webhook")
+async def verify_token(request: Request):
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+    if token == config["VERIFY_TOKEN"]:
+        return int(challenge)
+    else:
+        raise HTTPException(status_code=403, detail="Invalid verification token")
+
+
 # Run the application with uvicorn
 if __name__ == "__main__":
     import uvicorn
